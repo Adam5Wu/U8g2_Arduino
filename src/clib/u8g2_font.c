@@ -741,20 +741,15 @@ uint8_t u8g2_IsGlyph(u8g2_t *u8g2, uint16_t requested_encoding)
   return 0;
 }
 
+static void u8g2_GetGlyphHorizontalProperties(u8g2_t *u8g2, uint16_t requested_encoding, uint8_t *w, int8_t *ox, int8_t *dx);
+
 /* side effect: updates u8g2->font_decode and u8g2->glyph_x_offset */
 int8_t u8g2_GetGlyphWidth(u8g2_t *u8g2, uint16_t requested_encoding)
 {
-  const uint8_t *glyph_data = u8g2_font_get_glyph_data(u8g2, requested_encoding);
-  if ( glyph_data == NULL )
-    return 0; 
-  
-  u8g2_font_setup_decode(u8g2, glyph_data);
-  u8g2->glyph_x_offset = u8g2_font_decode_get_signed_bits(&(u8g2->font_decode), u8g2->font_info.bits_per_char_x);
-  u8g2_font_decode_get_signed_bits(&(u8g2->font_decode), u8g2->font_info.bits_per_char_y);
-  
-  /* glyph width is here: u8g2->font_decode.glyph_width */
-
-  return u8g2_font_decode_get_signed_bits(&(u8g2->font_decode), u8g2->font_info.bits_per_delta_x);
+    uint8_t w;
+	int8_t dx;
+	u8g2_GetGlyphHorizontalProperties(u8g2, requested_encoding, &w, &u8g2->glyph_x_offset, &dx);
+	return dx;
 }
 
 
