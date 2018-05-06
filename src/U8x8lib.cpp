@@ -43,6 +43,13 @@
 #endif 
 #ifdef U8X8_HAVE_HW_I2C
 #include <Wire.h>
+
+#if defined(ESP8266) && (F_CPU != FCPU80)
+#define I2C_CLOCK 600000L
+#else
+#define I2C_CLOCK 400000L
+#endif
+
 #endif
 
 /*=============================================*/
@@ -993,7 +1000,7 @@ extern "C" uint8_t u8x8_byte_arduino_hw_i2c(U8X8_UNUSED u8x8_t *u8x8, U8X8_UNUSE
       /* if there is any error with Wire.setClock() just remove this function call */
       if ( u8x8->display_info->i2c_bus_clock_100kHz >= 4 )
       {
-	Wire.setClock(400000L); 
+	Wire.setClock(I2C_CLOCK);
       }
 #endif
       Wire.beginTransmission(u8x8_GetI2CAddress(u8x8)>>1);
@@ -1027,7 +1034,7 @@ extern "C" uint8_t u8x8_byte_arduino_2nd_hw_i2c(U8X8_UNUSED u8x8_t *u8x8, U8X8_U
       /* if there is any error with Wire.setClock() just remove this function call */
       if ( u8x8->display_info->i2c_bus_clock_100kHz >= 4 )
       {
-	Wire1.setClock(400000L); 
+	Wire1.setClock(I2C_CLOCK);
       }
 #endif
       Wire1.beginTransmission(u8x8_GetI2CAddress(u8x8)>>1);
