@@ -148,6 +148,11 @@
 #define U8G2_WITH_CLIPPING
 
 
+// Enable glyph data cache
+#define U8G2_WITH_GLYPH_CACHE
+
+// Use static glyph cache (no malloc/free/CleanupBuffer, slightly more RAM consumption)
+//#define U8G2_GLYPH_CACHE_STATIC
 
 
 /*==========================================*/
@@ -259,6 +264,9 @@ struct _u8g2_font_decode_t
 #ifdef U8G2_WITH_FONT_ROTATION  
   uint8_t dir;				/* direction */
 #endif
+#if defined(U8G2_WITH_GLYPH_CACHE) && !defined(U8G2_GLYPH_CACHE_STATIC)
+  uint8_t cached;
+#endif
 };
 typedef struct _u8g2_font_decode_t u8g2_font_decode_t;
 
@@ -345,11 +353,15 @@ struct u8g2_struct
   unsigned long hv_cnt;
 #endif /* U8G2_WITH_HVLINE_COUNT */   
 
-// removed, there is now the new index table
-//#ifdef __unix__
-//  uint16_t last_unicode;
-//  const uint8_t *last_font_data;
-//#endif
+#ifdef U8G2_WITH_GLYPH_CACHE
+  uint16_t last_glyph_symbol;
+#ifdef U8G2_GLYPH_CACHE_STATIC
+  uint8_t glyph_data[255];
+#else
+  uint8_t *glyph_data;
+  uint8_t glyph_data_len;
+#endif
+#endif
 
 };
 
@@ -418,6 +430,9 @@ extern const u8g2_cb_t u8g2_cb_mirror;
 */
 
 void u8g2_SetupBuffer(u8g2_t *u8g2, uint8_t *buf, uint8_t tile_buf_height, u8g2_draw_ll_hvline_cb ll_hvline_cb, const u8g2_cb_t *u8g2_cb);
+#if defined(U8G2_WITH_GLYPH_CACHE) && !defined(U8G2_GLYPH_CACHE_STATIC)
+void u8g2_CleanupBuffer(u8g2_t *u8g2);
+#endif
 void u8g2_SetDisplayRotation(u8g2_t *u8g2, const u8g2_cb_t *u8g2_cb);
 
 /* null device setup */

@@ -69,7 +69,18 @@ void u8g2_SetupBuffer(u8g2_t *u8g2, uint8_t *buf, uint8_t tile_buf_height, u8g2_
 #ifdef U8G2_WITH_FONT_ROTATION  
   u8g2->font_decode.dir = 0;
 #endif
+
+#if defined(U8G2_WITH_GLYPH_CACHE) && !defined(U8G2_GLYPH_CACHE_STATIC)
+  u8g2->glyph_data_len = 0;
+  u8g2->glyph_data = NULL;
+#endif
 }
+
+#if defined(U8G2_WITH_GLYPH_CACHE) && !defined(U8G2_GLYPH_CACHE_STATIC)
+void u8g2_CleanupBuffer(u8g2_t *u8g2) {
+  free(u8g2->glyph_data);
+}
+#endif
 
 /*
   Usually the display rotation is set initially, but it could be done later also
