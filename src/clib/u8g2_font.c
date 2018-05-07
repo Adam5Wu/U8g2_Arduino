@@ -1073,10 +1073,6 @@ void u8g2_SetFont(u8g2_t *u8g2, const uint8_t  *font)
 {
   if ( u8g2->font != font )
   {
-//#ifdef  __unix__
-//	u8g2->last_font_data = NULL;
-//	u8g2->last_unicode = 0x0ffff;
-//#endif 
     u8g2->font = font;
     u8g2_read_font_info(&(u8g2->font_info), font);
     u8g2_UpdateRefHeight(u8g2);
