@@ -1,12 +1,29 @@
 # U8g2_Arduino: Arduino Monochrome Graphics Library
+[![Build Status](https://travis-ci.org/Adam5Wu/U8g2_Arduino.svg?branch=adam5wu/master)](https://travis-ci.org/Adam5Wu/U8g2_Arduino)
+[![GitHub issues](https://img.shields.io/github/issues/Adam5Wu/U8g2_Arduino.svg)](https://github.com/Adam5Wu/U8g2_Arduino/issues)
+[![GitHub forks](https://img.shields.io/github/forks/Adam5Wu/U8g2_Arduino.svg)](https://github.com/Adam5Wu/U8g2_Arduino/network)
+[![License](https://img.shields.io/github/license/Adam5Wu/U8g2_Arduino.svg)](./LICENSE)
 
-![https://raw.githubusercontent.com/wiki/olikraus/u8g2/img/uc1701_dogs102_uno_board_320.jpg](https://raw.githubusercontent.com/wiki/olikraus/u8g2/img/uc1701_dogs102_uno_board_320.jpg) 
+Modified with one feature:
+* Allows storing font glyph data in files, in addition to embed within sketch
+	* Benefits:
+		1. Reduced sketch binary size, especially when handling heavy font sets (e.g. GB2312)
+		2. Change fonts at run-time becomes possible
 
-U8glib V2 library for Arduino
+Caveat:
+* Current implementation require in-memory glyph data cache
+	* There are two caching modes:
+		1. Dynamic memory allocation, will consume memory up to the largest single glyph in the font
+			* Requires `malloc()` and `free()` support
+			* Requires additional call to `u8g2_CleanupBuffer()` to release buffer
+				* C++ `U8G2` objects will automatically invoke in destructor
+		2. Static memory allocation, will consume fixed amount of memory
+			* Does not require memory management or cleanup
+			* If not enough to contain a glyph data from font file, glyph will NOT be printed
+				* Limitation only applies to file based font
 
-Description: https://github.com/olikraus/u8g2/wiki
-
-Issue Tracker: https://github.com/olikraus/u8g2/issues
-
-Download (2.23.2): https://github.com/olikraus/U8g2_Arduino/archive/master.zip
-
+* [Upstream Project](https://github.com/olikraus/U8g2_Arduino)
+* Potentially interesting:
+	- [ESP8266 Arduino Core fork](https://github.com/Adam5Wu/Arduino-esp8266)
+  - [ZWUtils-Arduino](https://github.com/Adam5Wu/ZWUtils-Arduino)
+  - [ESPVFATFS](https://github.com/Adam5Wu/ESPVFATFS)
