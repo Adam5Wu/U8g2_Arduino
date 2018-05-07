@@ -51,15 +51,42 @@
 
 #include "clib/u8g2.h"
 
+#ifdef U8G2_WITH_FONT_FILE
+#include <FS.h>
+#endif
+
 class U8G2 : public Print
 {
   protected:
     u8g2_t u8g2;
     u8x8_char_cb cpp_next_cb; /*  the cpp interface has its own decoding function for the Arduino print command */
+#ifdef U8G2_WITH_FONT_FILE
+    File font_file;
+	uint32_t font_file_pos;
+
+    static uint8_t read_font_file(const void *fontref, uint8_t *buf, uint32_t offset, uint8_t len) {
+      auto self = (U8G2*) fontref;
+      if (self->font_file_pos != offset) {
+	self->font_file.seek(offset);
+	self->font_file_pos = offset;
+      }
+      uint8_t readlen = 0;
+      while (readlen < len) {
+	size_t ret = self->font_file.read(buf+readlen, len-readlen);
+	readlen += ret;
+	if (ret == 0) break;
+      }
+      self->font_file_pos += readlen;
+      return readlen;
+    }
+#endif
   public:
     u8g2_uint_t tx, ty;
   
     U8G2(void) { cpp_next_cb = u8x8_ascii_next; home(); }
+#if defined(U8G2_WITH_GLYPH_CACHE) && !defined(U8G2_GLYPH_CACHE_STATIC)
+	~U8G2(void) { u8g2_CleanupBuffer(&u8g2); }
+#endif
     u8x8_t *getU8x8(void) { return u8g2_GetU8x8(&u8g2); }
     u8g2_t *getU8g2(void) { return &u8g2; }
 
@@ -212,7 +239,19 @@ class U8G2 : public Print
     
     /* u8g2_font.c */
 
-    void setFont(const uint8_t  *font) {u8g2_SetFont(&u8g2, font); }
+    void setFont(const uint8_t  *font) {
+#ifdef U8G2_WITH_FONT_FILE
+      font_file = File();
+#endif
+      u8g2_SetFont(&u8g2, font);
+    }
+#ifdef U8G2_WITH_FONT_FILE
+    void setFont(File &font) {
+      font_file = font;
+	  font_file_pos = 0;
+      u8g2_SetFontFile(&u8g2, this, read_font_file);
+    }
+#endif
     void setFontMode(uint8_t  is_transparent) {u8g2_SetFontMode(&u8g2, is_transparent); }
     void setFontDirection(uint8_t dir) {u8g2_SetFontDirection(&u8g2, dir); }
 
