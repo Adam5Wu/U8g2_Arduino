@@ -127,9 +127,11 @@ static uint16_t u8g2_font_get_word(const uint8_t *font, uint8_t offset)
 }
 
 #ifdef U8G2_WITH_GLYPH_CACHE
-static void u8g2_font_load_glyph_data(u8g2_t *u8g2, const void *font, uint8_t len)
+static uint8_t *u8g2_font_prepare_glyph_buffer(u8g2_t *u8g2, uint8_t len)
 {
-#ifndef U8G2_GLYPH_CACHE_STATIC
+#ifdef U8G2_GLYPH_CACHE_STATIC
+	if (U8G2_GLYPH_CACHE_STATIC < len) return NULL;
+#else
 	if (u8g2->glyph_data_len < len) {
 		void* new_glyph_data = realloc(u8g2->glyph_data, len);
 		if (new_glyph_data) {
@@ -139,21 +141,98 @@ static void u8g2_font_load_glyph_data(u8g2_t *u8g2, const void *font, uint8_t le
 			free(u8g2->glyph_data);
 			u8g2->glyph_data = NULL;
 			u8g2->glyph_data_len = 0;
-			return;
 		}
 	}
 #endif
-	uint16_t pos = 0;
-	while (pos < len) {
-		u8g2->glyph_data[pos++] = u8x8_pgm_read( font++ );
-	}
+	return u8g2->glyph_data;
 }
+
+static uint8_t u8g2_font_load_glyph_data(u8g2_t *u8g2, const void *font, uint8_t len)
+{
+	uint8_t *glyphbuf = u8g2_font_prepare_glyph_buffer(u8g2, len);
+	uint8_t pos = 0;
+	if (glyphbuf) {
+		while (pos < len) glyphbuf[pos++] = u8x8_pgm_read( font++ );
+	}
+	return pos;
+}
+#endif
+
+#ifdef U8G2_WITH_FONT_FILE
+static uint8_t u8g2_fontfile_get_byte(u8g2_read_font_cb read_font, const void *fontref, uint8_t offset)
+{
+	uint8_t ret = 0;
+	read_font(fontref, &ret, offset, 1);
+	return ret;
+}
+
+#define ntohs(x) ( ((x)<< 8 & 0x0FF00) | ((x)>> 8 & 0x0FF) )
+
+static uint16_t u8g2_fontfile_get_word(u8g2_read_font_cb read_font, const void *fontref, uint8_t offset) U8G2_NOINLINE;
+static uint16_t u8g2_fontfile_get_word(u8g2_read_font_cb read_font, const void *fontref, uint8_t offset)
+{
+	uint16_t ret = 0;
+	read_font(fontref, &ret, offset, 2);
+	return ntohs(ret);
+}
+
+#ifdef U8G2_WITH_GLYPH_CACHE
+static uint8_t u8g2_fontfile_load_glyph_data(u8g2_t *u8g2, u8g2_read_font_cb read_font, const void *fontref, uint32_t offset, uint8_t len)
+{
+	uint8_t *glyphbuf = u8g2_font_prepare_glyph_buffer(u8g2, len);
+	if (glyphbuf) {
+		read_font(fontref, glyphbuf, offset, len);
+		return len;
+	}
+	return 0;
+}
+#endif
+
 #endif
 
 /*========================================================================*/
 /* new font format */
 void u8g2_read_font_info(u8g2_font_info_t *font_info, const uint8_t *font)
 {
+#ifdef U8G2_WITH_FONT_FILE
+  if (font_info->read_font) {
+	/* offset 0 */
+	font_info->glyph_cnt = u8g2_fontfile_get_byte(font_info->read_font, font, 0);
+	font_info->bbx_mode = u8g2_fontfile_get_byte(font_info->read_font, font, 1);
+	font_info->bits_per_0 = u8g2_fontfile_get_byte(font_info->read_font, font, 2);
+	font_info->bits_per_1 = u8g2_fontfile_get_byte(font_info->read_font, font, 3);
+
+	/* offset 4 */
+	font_info->bits_per_char_width = u8g2_fontfile_get_byte(font_info->read_font, font, 4);
+	font_info->bits_per_char_height = u8g2_fontfile_get_byte(font_info->read_font, font, 5);
+	font_info->bits_per_char_x = u8g2_fontfile_get_byte(font_info->read_font, font, 6);
+	font_info->bits_per_char_y = u8g2_fontfile_get_byte(font_info->read_font, font, 7);
+	font_info->bits_per_delta_x = u8g2_fontfile_get_byte(font_info->read_font, font, 8);
+
+	/* offset 9 */
+	font_info->max_char_width = u8g2_fontfile_get_byte(font_info->read_font, font, 9);
+	font_info->max_char_height = u8g2_fontfile_get_byte(font_info->read_font, font, 10);
+	font_info->x_offset = u8g2_fontfile_get_byte(font_info->read_font, font, 11);
+	font_info->y_offset = u8g2_fontfile_get_byte(font_info->read_font, font, 12);
+
+	/* offset 13 */
+	font_info->ascent_A = u8g2_fontfile_get_byte(font_info->read_font, font, 13);
+	font_info->descent_g = u8g2_fontfile_get_byte(font_info->read_font, font, 14);
+	font_info->ascent_para = u8g2_fontfile_get_byte(font_info->read_font, font, 15);
+	font_info->descent_para = u8g2_fontfile_get_byte(font_info->read_font, font, 16);
+
+	/* offset 17 */
+	font_info->start_pos_upper_A = u8g2_fontfile_get_word(font_info->read_font, font, 17);
+	font_info->start_pos_lower_a = u8g2_fontfile_get_word(font_info->read_font, font, 19);
+
+	/* offset 21 */
+#ifdef U8G2_WITH_UNICODE
+	font_info->start_pos_unicode = u8g2_fontfile_get_word(font_info->read_font, font, 21);
+#endif
+	return;
+  }
+#endif
+
   /* offset 0 */
   font_info->glyph_cnt = u8g2_font_get_byte(font, 0);
   font_info->bbx_mode = u8g2_font_get_byte(font, 1);
@@ -637,79 +716,115 @@ int8_t u8g2_font_decode_glyph(u8g2_t *u8g2, const uint8_t *glyph_data)
 const uint8_t *u8g2_font_get_glyph_data(u8g2_t *u8g2, uint16_t encoding)
 {
   const uint8_t *font = u8g2->font;
-  font += U8G2_FONT_DATA_STRUCT_SIZE;
+#ifdef U8G2_WITH_FONT_FILE
+  u8g2_read_font_cb read_font = u8g2->font_info.read_font;
+#endif
+  uint32_t font_offset = U8G2_FONT_DATA_STRUCT_SIZE;
 
-  
+  uint16_t e;
+  uint8_t glyph_len;
   if ( encoding <= 255 )
   {
     if ( encoding >= 'a' )
     {
-      font += u8g2->font_info.start_pos_lower_a;
+      font_offset += u8g2->font_info.start_pos_lower_a;
     }
     else if ( encoding >= 'A' )
     {
-      font += u8g2->font_info.start_pos_upper_A;
+      font_offset += u8g2->font_info.start_pos_upper_A;
     }
     
     for(;;)
     {
-      uint8_t glyph_len = u8x8_pgm_read( font + 1 );
-      if ( glyph_len == 0 )
-	break;
-
-      if ( u8x8_pgm_read( font ) == encoding )
-      {
-#ifdef U8G2_WITH_GLYPH_CACHE
-	if (u8g2->last_glyph_symbol != encoding) {
-	  u8g2->last_glyph_symbol = encoding;
-	  u8g2_font_load_glyph_data(u8g2, font+2, glyph_len-2);
-	}
+#ifdef U8G2_WITH_FONT_FILE
+      if (read_font) e = u8g2_fontfile_get_byte( read_font, font, font_offset );
+      else
 #endif
-	return font+2;	/* skip encoding and glyph size */
-      }
-      font += glyph_len;
-    }
-  }
-#ifdef U8G2_WITH_UNICODE
-  else
-  {
-    uint16_t e;
-    const uint8_t *unicode_lookup_table;
-
-    font += u8g2->font_info.start_pos_unicode;
-    unicode_lookup_table = font; 
-  
-    /* issue 596: search for the glyph start in the unicode lookup table */
-    do
-    {
-      font += u8g2_font_get_word(unicode_lookup_table, 0);
-      e = u8g2_font_get_word(unicode_lookup_table, 2);
-      unicode_lookup_table+=4;
-    } while( e < encoding );
-    
-  
-    for(;;)
-    {
-      uint8_t glyph_len = u8x8_pgm_read( font + 2 );
-      if ( glyph_len == 0 )
+      e = u8g2_font_get_byte( font+font_offset, 0 );
+      if ( e == 0 )
 	break;
 
-      e = u8x8_pgm_read( font );
-      e <<= 8;
-      e |= u8x8_pgm_read( font + 1 );
-
+#ifdef U8G2_WITH_FONT_FILE
+      if (read_font) glyph_len = u8g2_fontfile_get_byte( read_font, font, font_offset+1 );
+      else
+#endif
+      glyph_len = u8g2_font_get_byte( font+font_offset, 1 );
       if ( e == encoding )
       {
 #ifdef U8G2_WITH_GLYPH_CACHE
 	if (u8g2->last_glyph_symbol != encoding) {
 	  u8g2->last_glyph_symbol = encoding;
-	  u8g2_font_load_glyph_data(u8g2, font+3, glyph_len-3);
+#ifdef U8G2_WITH_FONT_FILE
+	  if (read_font) {
+	    if (u8g2_fontfile_load_glyph_data(u8g2, read_font, font, font_offset+2, glyph_len-2) == 0) return NULL;
+	  } else
+#endif
+	  u8g2_font_load_glyph_data(u8g2, font+font_offset+2, glyph_len-2);
 	}
 #endif
-	return font+3;	/* skip encoding and glyph size */
+	return font+font_offset+2;	/* skip encoding and glyph size */
       }
-      font += u8x8_pgm_read( font + 2 );
-    }  
+      font_offset += glyph_len;
+    }
+  }
+#ifdef U8G2_WITH_UNICODE
+  else
+  {
+    font_offset += u8g2->font_info.start_pos_unicode;
+	uint32_t glyph_offset = 0;
+	uint16_t index_offset = 0;
+  
+    /* issue 596: search for the glyph start in the unicode lookup table */
+#ifdef U8G2_WITH_FONT_FILE
+    if (read_font) {
+      do
+      {
+	glyph_offset += u8g2_fontfile_get_word(read_font, font, font_offset+index_offset);
+	e = u8g2_fontfile_get_word(read_font, font, font_offset+index_offset+2);
+	index_offset+=4;
+      } while( e < encoding );
+    } else
+#endif
+    do
+    {
+      glyph_offset += u8g2_font_get_word(font+font_offset+index_offset, 0);
+      e = u8g2_font_get_word(font+font_offset+index_offset, 2);
+      index_offset+=4;
+    } while( e < encoding );
+	font_offset += glyph_offset;
+
+    for(;;)
+    {
+#ifdef U8G2_WITH_FONT_FILE
+      if (read_font) e = u8g2_fontfile_get_word( read_font, font, font_offset );
+      else
+#endif
+      e = u8g2_font_get_word( font+font_offset, 0 );
+      if ( e == 0 )
+	break;
+
+#ifdef U8G2_WITH_FONT_FILE
+      if (read_font) glyph_len = u8g2_fontfile_get_byte( read_font, font, font_offset+2 );
+      else
+#endif
+      glyph_len = u8g2_font_get_byte( font+font_offset, 2 );
+      if ( e == encoding )
+      {
+#ifdef U8G2_WITH_GLYPH_CACHE
+	if (u8g2->last_glyph_symbol != encoding) {
+	  u8g2->last_glyph_symbol = encoding;
+#ifdef U8G2_WITH_FONT_FILE
+	  if (read_font) {
+	    if (u8g2_fontfile_load_glyph_data(u8g2, read_font, font, font_offset+3, glyph_len-3) == 0) return NULL;
+	  } else
+#endif
+	  u8g2_font_load_glyph_data(u8g2, font+font_offset+3, glyph_len-3);
+	}
+#endif
+	return font+font_offset+3;	/* skip encoding and glyph size */
+      }
+      font_offset += glyph_len;
+    }
   }
 #endif
   
@@ -1069,11 +1184,25 @@ void u8g2_SetFont(u8g2_t *u8g2, const uint8_t  *font)
   if ( u8g2->font != font )
   {
     u8g2->font = font;
+#ifdef U8G2_WITH_FONT_FILE
+    u8g2->font_info.read_font = NULL;
+#endif
     u8g2_read_font_info(&(u8g2->font_info), font);
     u8g2_UpdateRefHeight(u8g2);
     /* u8g2_SetFontPosBaseline(u8g2); */ /* removed with issue 195 */
   }
 }
+
+#ifdef U8G2_WITH_FONT_FILE
+void u8g2_SetFontFile(u8g2_t *u8g2, const void *fontref, u8g2_read_font_cb read_font)
+{
+    u8g2->font = (const uint8_t *)fontref;
+	u8g2->font_info.read_font = read_font;
+    u8g2_read_font_info(&(u8g2->font_info), u8g2->font);
+    u8g2_UpdateRefHeight(u8g2);
+    /* u8g2_SetFontPosBaseline(u8g2); */ /* removed with issue 195 */
+}
+#endif
 
 /*===============================================*/
 

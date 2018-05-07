@@ -152,8 +152,16 @@
 #define U8G2_WITH_GLYPH_CACHE
 
 // Use static glyph cache (no malloc/free/CleanupBuffer, slightly more RAM consumption)
-//#define U8G2_GLYPH_CACHE_STATIC
+#define U8G2_GLYPH_CACHE_STATIC 64
 
+// Enable use of font file instead of embedding into sketch
+#define U8G2_WITH_FONT_FILE
+
+#ifdef U8G2_WITH_FONT_FILE
+#ifndef U8G2_WITH_GLYPH_CACHE
+#error Font file feature requires U8G2_WITH_GLYPH_CACHE
+#endif
+#endif
 
 /*==========================================*/
 
@@ -204,6 +212,9 @@ typedef void (*u8g2_draw_ll_hvline_cb)(u8g2_t *u8g2, u8g2_uint_t x, u8g2_uint_t 
 
 typedef uint8_t (*u8g2_get_kerning_cb)(u8g2_t *u8g2, uint16_t e1, uint16_t e2);
 
+#ifdef U8G2_WITH_FONT_FILE
+typedef uint8_t (*u8g2_read_font_cb)(const void *fontref, uint8_t *buf, uint32_t offset, uint8_t len);
+#endif
 
 /* from ucglib... */
 struct _u8g2_font_info_t
@@ -240,6 +251,10 @@ struct _u8g2_font_info_t
   /* offset 21 */
 #ifdef U8G2_WITH_UNICODE  
   uint16_t start_pos_unicode;
+#endif
+
+#ifdef U8G2_WITH_FONT_FILE
+  u8g2_read_font_cb read_font;
 #endif
 };
 typedef struct _u8g2_font_info_t u8g2_font_info_t;
@@ -356,7 +371,7 @@ struct u8g2_struct
 #ifdef U8G2_WITH_GLYPH_CACHE
   uint16_t last_glyph_symbol;
 #ifdef U8G2_GLYPH_CACHE_STATIC
-  uint8_t glyph_data[255];
+  uint8_t glyph_data[U8G2_GLYPH_CACHE_STATIC];
 #else
   uint8_t *glyph_data;
   uint8_t glyph_data_len;
@@ -1081,6 +1096,9 @@ size_t u8g2_GetFontSize(const uint8_t *font_arg);
 #define U8G2_FONT_HEIGHT_MODE_ALL 2
 
 void u8g2_SetFont(u8g2_t *u8g2, const uint8_t  *font);
+#ifdef U8G2_WITH_FONT_FILE
+void u8g2_SetFontFile(u8g2_t *u8g2, const void *fontref, u8g2_read_font_cb read_font);
+#endif
 void u8g2_SetFontMode(u8g2_t *u8g2, uint8_t is_transparent);
 
 uint8_t u8g2_IsGlyph(u8g2_t *u8g2, uint16_t requested_encoding);
