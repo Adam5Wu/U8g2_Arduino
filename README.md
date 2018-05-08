@@ -13,7 +13,7 @@ Modified with one feature:
 Caveat:
 * Current implementation require in-memory glyph data cache
 	* There are two caching modes:
-		1. Dynamic memory allocation, will consume memory up to the largest single glyph in the font
+		1. [Default] Dynamic memory allocation, will consume memory up to the largest single glyph in the font
 			* Requires `malloc()` and `free()` support
 			* Requires additional call to `u8g2_CleanupBuffer()` to release buffer
 				* C++ `U8G2` objects will automatically invoke in destructor
@@ -21,6 +21,16 @@ Caveat:
 			* Does not require memory management or cleanup
 			* If not enough to contain a glyph data from font file, glyph will NOT be printed
 				* Limitation only applies to file based font
+* Current implementation incurs observable slow down when using font file compared with embedded font
+	* Using Shennong example's per frame glyph drawing time as benchmark
+		- Embedded font: 21ms per frame
+		- Font file (no cache): 188ms per frame (7.95x slow down)
+		- Font file (+scan cache): 156ms per frame (6.43x slow down)
+			- Consumes extra 256 bytes memory for faster glyph scan operation
+		- Font file (+glyph index cache): 138ms per frame (5.57x slow down)
+			- Consumes extra 400 bytes memory for faster index lookup
+		- [Default] Font file (+scan cache +glyph index cache): 114ms per frame (4.43x slow down)
+			- Consumes extra 656 bytes memory for faster glyph lookup
 
 * [Upstream Project](https://github.com/olikraus/U8g2_Arduino)
 * Potentially interesting:
