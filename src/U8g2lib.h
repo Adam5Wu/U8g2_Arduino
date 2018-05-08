@@ -62,22 +62,54 @@ class U8G2 : public Print
     u8x8_char_cb cpp_next_cb; /*  the cpp interface has its own decoding function for the Arduino print command */
 #ifdef U8G2_WITH_FONT_FILE
     File font_file;
-	uint32_t font_file_pos;
+    uint32_t font_scan_pos;
+#ifdef U8G2_FONT_FILE_SCAN_BUFFER
+    uint8_t font_scan_buffer[U8G2_FONT_FILE_SCAN_BUFFER];
+#endif
+
+    static uint16_t load_font_buffer(File &font_file, uint8_t *buffer, uint16_t size) {
+		uint16_t readlen = 0;
+		do {
+			size_t ret = font_file.read(buffer+readlen, size-readlen);
+			if (ret == 0) {
+				memset(buffer+readlen, 0, size-readlen);
+				break;
+			}
+			readlen += ret;
+		} while (readlen < size);
+		return readlen;
+    }
 
     static uint8_t read_font_file(const void *fontref, uint8_t *buf, uint32_t offset, uint8_t len) {
-      auto self = (U8G2*) fontref;
-      if (self->font_file_pos != offset) {
-	self->font_file.seek(offset);
-	self->font_file_pos = offset;
-      }
-      uint8_t readlen = 0;
-      while (readlen < len) {
-	size_t ret = self->font_file.read(buf+readlen, len-readlen);
-	readlen += ret;
-	if (ret == 0) break;
-      }
-      self->font_file_pos += readlen;
-      return readlen;
+		auto self = (U8G2*) fontref;
+#ifdef U8G2_FONT_FILE_SCAN_BUFFER
+		if (offset < self->font_scan_pos || offset+len > self->font_scan_pos+U8G2_FONT_FILE_SCAN_BUFFER) {
+			if (self->font_scan_pos < offset && self->font_scan_pos+U8G2_FONT_FILE_SCAN_BUFFER >= offset) {
+				// Optimize for incremental scan forward
+				uint8_t part_len = self->font_scan_pos+U8G2_FONT_FILE_SCAN_BUFFER-offset;
+				if (part_len) {
+					memcpy(buf, self->font_scan_buffer+offset-self->font_scan_pos, part_len);
+					buf+= part_len;
+					offset+= part_len;
+					len-= part_len;
+				}
+			} else {
+				self->font_file.seek(offset);
+			}
+			self->font_scan_pos = offset;
+			load_font_buffer(self->font_file, self->font_scan_buffer, U8G2_FONT_FILE_SCAN_BUFFER);
+		}
+		memcpy(buf, self->font_scan_buffer+offset-self->font_scan_pos, len);
+		return len;
+#else
+		if (self->font_scan_pos != offset) {
+			self->font_file.seek(offset);
+			self->font_scan_pos = offset;
+		}
+		uint8_t readlen = load_font_buffer(self->font_file, buf, len);
+		self->font_scan_pos += readlen;
+		return readlen;
+#endif
     }
 #endif
   public:
@@ -248,7 +280,10 @@ class U8G2 : public Print
 #ifdef U8G2_WITH_FONT_FILE
     void setFont(File &font) {
       font_file = font;
-	  font_file_pos = 0;
+      font_scan_pos = 0;
+#ifdef U8G2_FONT_FILE_SCAN_BUFFER
+      load_font_buffer(font, font_scan_buffer, U8G2_FONT_FILE_SCAN_BUFFER);
+#endif
       u8g2_SetFontFile(&u8g2, this, read_font_file);
     }
 #endif
