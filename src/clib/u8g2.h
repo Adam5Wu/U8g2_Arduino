@@ -152,10 +152,16 @@
 #define U8G2_WITH_GLYPH_CACHE
 
 // Use static glyph cache (no malloc/free/CleanupBuffer, slightly more RAM consumption)
-#define U8G2_GLYPH_CACHE_STATIC 64
+//#define U8G2_GLYPH_CACHE_STATIC 64
 
 // Enable use of font file instead of embedding into sketch
 #define U8G2_WITH_FONT_FILE
+
+// Load unicode glyph index into memory (consumes 4*N bytes memory)
+#define U8G2_FONT_FILE_CACHE_INDEX 100
+
+// In-memory buffer for quick glyph scanning
+#define U8G2_FONT_FILE_SCAN_BUFFER 512
 
 #ifdef U8G2_WITH_FONT_FILE
 #ifndef U8G2_WITH_GLYPH_CACHE
@@ -255,6 +261,11 @@ struct _u8g2_font_info_t
 
 #ifdef U8G2_WITH_FONT_FILE
   u8g2_read_font_cb read_font;
+#ifdef U8G2_WITH_UNICODE
+#ifdef U8G2_FONT_FILE_CACHE_INDEX
+  uint16_t glyph_index[U8G2_FONT_FILE_CACHE_INDEX*2];
+#endif
+#endif
 #endif
 };
 typedef struct _u8g2_font_info_t u8g2_font_info_t;
@@ -377,7 +388,6 @@ struct u8g2_struct
   uint8_t glyph_data_len;
 #endif
 #endif
-
 };
 
 #define u8g2_GetU8x8(u8g2) ((u8x8_t *)(u8g2))

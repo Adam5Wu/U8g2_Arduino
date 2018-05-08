@@ -122,7 +122,7 @@ static uint16_t u8g2_font_get_word(const uint8_t *font, uint8_t offset)
     pos = u8x8_pgm_read( font );
     font++;
     pos <<= 8;
-    pos += u8x8_pgm_read( font);
+    pos += u8x8_pgm_read( font );
     return pos;
 }
 
@@ -159,7 +159,7 @@ static uint8_t u8g2_font_load_glyph_data(u8g2_t *u8g2, const void *font, uint8_t
 #endif
 
 #ifdef U8G2_WITH_FONT_FILE
-static uint8_t u8g2_fontfile_get_byte(u8g2_read_font_cb read_font, const void *fontref, uint8_t offset)
+static uint8_t u8g2_fontfile_get_byte(u8g2_read_font_cb read_font, const void *fontref, uint32_t offset)
 {
 	uint8_t ret = 0;
 	read_font(fontref, &ret, offset, 1);
@@ -168,8 +168,8 @@ static uint8_t u8g2_fontfile_get_byte(u8g2_read_font_cb read_font, const void *f
 
 #define ntohs(x) ( ((x)<< 8 & 0x0FF00) | ((x)>> 8 & 0x0FF) )
 
-static uint16_t u8g2_fontfile_get_word(u8g2_read_font_cb read_font, const void *fontref, uint8_t offset) U8G2_NOINLINE;
-static uint16_t u8g2_fontfile_get_word(u8g2_read_font_cb read_font, const void *fontref, uint8_t offset)
+static uint16_t u8g2_fontfile_get_word(u8g2_read_font_cb read_font, const void *fontref, uint32_t offset) U8G2_NOINLINE;
+static uint16_t u8g2_fontfile_get_word(u8g2_read_font_cb read_font, const void *fontref, uint32_t offset)
 {
 	uint16_t ret = 0;
 	read_font(fontref, &ret, offset, 2);
@@ -228,6 +228,20 @@ void u8g2_read_font_info(u8g2_font_info_t *font_info, const uint8_t *font)
 	/* offset 21 */
 #ifdef U8G2_WITH_UNICODE
 	font_info->start_pos_unicode = u8g2_fontfile_get_word(font_info->read_font, font, 21);
+
+#ifdef U8G2_FONT_FILE_CACHE_INDEX
+	uint32_t index_ofs = U8G2_FONT_DATA_STRUCT_SIZE+font_info->start_pos_unicode;
+	uint16_t idx = 0;
+	while (1) {
+		uint16_t delta_ofs = u8g2_fontfile_get_word(font_info->read_font, font, index_ofs);
+		uint16_t next_sym = u8g2_fontfile_get_word(font_info->read_font, font, index_ofs+2);
+		index_ofs += 4;
+		font_info->glyph_index[idx*2] = delta_ofs;
+		font_info->glyph_index[idx*2+1] = next_sym;
+		if (next_sym == 0x0FFFF) break;
+		if (idx < U8G2_FONT_FILE_CACHE_INDEX-1) ++idx;
+	}
+#endif
 #endif
 	return;
   }
@@ -779,9 +793,14 @@ const uint8_t *u8g2_font_get_glyph_data(u8g2_t *u8g2, uint16_t encoding)
     if (read_font) {
       do
       {
+#ifdef U8G2_FONT_FILE_CACHE_INDEX
+	glyph_offset += u8g2->font_info.glyph_index[index_offset++];
+	e = u8g2->font_info.glyph_index[index_offset++];
+#else
 	glyph_offset += u8g2_fontfile_get_word(read_font, font, font_offset+index_offset);
 	e = u8g2_fontfile_get_word(read_font, font, font_offset+index_offset+2);
 	index_offset+=4;
+#endif
       } while( e < encoding );
     } else
 #endif
@@ -833,7 +852,7 @@ const uint8_t *u8g2_font_get_glyph_data(u8g2_t *u8g2, uint16_t encoding)
 
 static u8g2_uint_t u8g2_font_draw_glyph(u8g2_t *u8g2, u8g2_uint_t x, u8g2_uint_t y, uint16_t encoding)
 {
-  u8g2_uint_t dx = 0;
+  u8g2_uint_t dx = u8g2->font_info.max_char_width;
   u8g2->font_decode.target_x = x;
   u8g2->font_decode.target_y = y;
   //u8g2->font_decode.is_transparent = is_transparent; this is already set
